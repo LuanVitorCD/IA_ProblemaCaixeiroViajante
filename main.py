@@ -95,6 +95,26 @@ def crossover_pmx(parent1, parent2):
             child[i] = parent2[i]
     return child
 
+def crossover_uniforme(parent1, parent2):
+    """Cruzamento Uniforme (UOX) adaptado para permutação (TSP)."""
+    size = len(parent1)
+    mask = [random.choice([0, 1]) for _ in range(size)]
+    child = [-1] * size
+    
+    # Passo 1: Herda do pai 1 onde a máscara é 1
+    for i in range(size):
+        if mask[i] == 1:
+            child[i] = parent1[i]
+            
+    # Passo 2: Preenche os espaços vazios com os genes do pai 2 (preservando a ordem)
+    p2_idx = 0
+    for i in range(size):
+        if child[i] == -1:
+            while parent2[p2_idx] in child:
+                p2_idx += 1
+            child[i] = parent2[p2_idx]
+    return child
+
 # MUTAÇÃO
 def mutate_swap(route):
     """Troca duas cidades de lugar."""
@@ -152,69 +172,91 @@ def main():
                 padding-bottom: 0rem !important;
             }
             div {
-                text-align: justify;
-            }
-            </style>
-            """
+            text-align: justify;
+        }
+        </style>
+        """
     st.markdown(hide_st_style, unsafe_allow_html=True)
 
     title_html = f"""
-                <div style='background-color: #1e1e1e; padding: 5px; border-radius: 5px; border-left: 4px solid {primary_color}; margin-bottom: 20px;'>
-                    <h2 style='font-size: 24px; margin-left: 10px; color: white;'><b>Caixeiro Viajante</b><br>
-                        <i style='font-size: 16px; margin-left: 10px;'><b style='color: {primary_color};'>Otimização:</b> Algoritmo Genético</i>
-                    </h2>
+                <div style='background-color: #1e1e1e; padding: 5px; border-radius: 5px; border-left: 4px solid {primary_color};'>
+                    <h1 style='font-size: 32px; margin-left: 10px;'><b>Caixeiro Viajante</b><br>
+                        <i style='font-size: 20px; margin-left: 10px;'><b style='color: {primary_color};'>Grupo: </b> Ana, Luan e Wesley</i>
+                    </h1>
                 </div>
                 """
+    
     st.sidebar.markdown(title_html, unsafe_allow_html=True)
 
-    info_html = """
-            <div style='background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 14px; margin-bottom: 15px;'>
-                <b style='color: #5ea1ff;'>Problema de Otimização NP-Difícil</b><br>
-                O objetivo é encontrar a rota mais curta que visite todas as cidades exatamente uma vez e retorne à origem.<br><br>
-                Usamos <b>Algoritmos Genéticos</b> baseados na Teoria da Evolução: População, Seleção, Cruzamento e Mutação para convergir à melhor solução global sem checar todas as <code>O(N!)</code> permutações.
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
+
+    info_html = f"""
+            <div style='background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 16px; margin-bottom: 15px;'>
+                <b style='color: #5ea1ff;'>Meta-Heurística: Algoritmo Genético</b><br>
+                O TSP exato tem complexidade <b>O(N!)</b> (NP-Difícil). <br><br>
+                Nesta aplicação, a IA explora apenas <b>O(População × Gerações)</b> estados, limitando drasticamente o espaço de busca e trocando a garantia da solução perfeita por uma convergência rápida e inteligente.<br><br>
             </div>
             """
-    with st.sidebar.expander("Explicação Algoritmo", expanded=True, icon="ℹ️"):
+    with st.sidebar.expander("Explicação & Complexidade", expanded=False, icon="ℹ️"):
         st.markdown(info_html, unsafe_allow_html=True)
 
     st.sidebar.divider()
-    st.sidebar.subheader("Mapa de Cidades")
-    
-    num_cities = st.sidebar.slider("Quantidade de Cidades", min_value=5, max_value=100, value=25)
-    
-    # Controle do Mapa
-    if len(st.session_state.cities) != num_cities or st.sidebar.button("🎲 Gerar Novo Mapa Aleatório", use_container_width=True):
-        st.session_state.cities = generate_cities(num_cities)
-        st.session_state.best_route = list(range(num_cities))
-        st.session_state.best_distance = route_distance(st.session_state.best_route, st.session_state.cities)
-        st.session_state.generations_count = 0
-        st.session_state.mutations_count = 0
+
+    st.sidebar.subheader("Técnicas Genéticas (Principais)")
+    selection_type = st.sidebar.selectbox("Método de Seleção", ["Torneio", "Roleta"])
+    crossover_type = st.sidebar.selectbox("Método de Cruzamento", ["Uniforme", "OX (Order Crossover)", "PMX (Partially Mapped)"])
+    mutation_type = st.sidebar.selectbox("Método de Mutação", ["Inversão (Recomendado)", "Swap (Troca Simples)"])
 
     st.sidebar.divider()
-    st.sidebar.subheader("Variáveis do Algoritmo Genético")
-    
-    pop_size = st.sidebar.number_input("Tamanho da População", min_value=10, max_value=1000, value=100, step=10)
-    max_gen = st.sidebar.number_input("Intervalo de Geração (Máx)", min_value=10, max_value=2000, value=200, step=10)
-    crossover_rate = st.sidebar.slider("Taxa de Cruzamento (%)", 0, 100, 90) / 100.0
-    mutation_rate = st.sidebar.slider("Taxa de Mutação (%)", 0, 100, 15) / 100.0
-    
-    with st.sidebar.expander("⚙️ Estratégias (Aptidão, Seleção, Crossover e Mutação)"):
-        st.markdown("**Aptidão (Fitness):** Calculada como `1 / Distância Total`. Quanto menor o trajeto, maior a aptidão de sobreviver.")
-        selection_type = st.selectbox("Método de Seleção", ["Torneio", "Roleta"])
-        crossover_type = st.selectbox("Método de Cruzamento", ["OX (Order Crossover)", "PMX (Partially Mapped)"])
-        mutation_type = st.selectbox("Método de Mutação", ["Inversão (Recomendado)", "Swap (Troca Simples)"])
+
+    # ---------------------------------------------------------
+    # CORAÇÃO DO SCRIPT - EXECUÇÃO
+    # ---------------------------------------------------------
+    start_btn = st.sidebar.button("Iniciar Evolução", type="primary", use_container_width=True)
 
     st.sidebar.divider()
-    st.sidebar.subheader("Opções de Performance")
-    animar = st.sidebar.toggle("Visualizar Animação (Evolução em Tempo Real)", value=True)
-    fps = 0.0
-    if animar:
-        fps = st.sidebar.slider("Velocidade da Animação (Atraso seg)", 0.0, 0.5, 0.05, step=0.01)
 
-# ---------------------------------------------------------
-# CORAÇÃO DO SCRIPT - EXECUÇÃO
-# ---------------------------------------------------------
-    start_btn = st.sidebar.button("🚀 Iniciar Evolução", type="primary", use_container_width=True)
+    with st.sidebar.popover("⚙️ Configurações Avançadas", use_container_width=True):
+        st.subheader("Mapa de Cidades")
+        
+        num_cities = st.slider("Quantidade de Cidades", min_value=5, max_value=100, value=25)
+        
+        # Controle do Mapa
+        if len(st.session_state.cities) != num_cities or st.button("🎲 Gerar Novo Mapa Aleatório", use_container_width=True):
+            st.session_state.cities = generate_cities(num_cities)
+            st.session_state.best_route = list(range(num_cities))
+            st.session_state.best_distance = route_distance(st.session_state.best_route, st.session_state.cities)
+            st.session_state.generations_count = 0
+            st.session_state.mutations_count = 0
+
+        st.divider()
+        st.subheader("Variáveis do Algoritmo Genético")
+        
+        pop_size = st.number_input("Tamanho da População", min_value=10, max_value=1000, value=100, step=10)
+        max_gen = st.number_input("Intervalo de Geração (Máx)", min_value=10, max_value=2000, value=200, step=10)
+        crossover_rate = st.slider("Taxa de Cruzamento (%)", 0, 100, 90) / 100.0
+        mutation_rate = st.slider("Taxa de Mutação (%)", 0, 100, 15) / 100.0
+        
+        st.markdown("**Aptidão (Fitness):** Calculada como `1 / Distância Total`. Rotas mais curtas ganham maior probabilidade.")
+        
+        k_tournament = 3
+        if selection_type == "Torneio":
+            k_tournament = st.slider("Tamanho do Torneio (k)", min_value=2, max_value=10, value=3, help="Define a pressão seletiva. K maior = maior chance de apenas os melhores serem escolhidos.")
+        else:
+            st.info("A seleção por **Roleta** usa probabilidade estrita baseada na aptidão. Não há parâmetros extras para ajustar.")
+            
+        if crossover_type == "Uniforme":
+            st.info("O **Cruzamento Uniforme** para TSP (UOX) utiliza uma máscara binária aleatória para mesclar as cidades. Evita cidades duplicadas preenchendo os espaços vazios seguindo a ordem do segundo pai.")
+            
+        if mutation_type == "Swap (Troca Simples)":
+            st.warning("A Mutação **Swap** é geralmente mais fraca para o TSP do que a Inversão, pois destrói conexões úteis na rota repetidas vezes de forma ineficiente.")
+
+        st.divider()
+        st.subheader("Opções de Performance")
+        animar = st.toggle("Visualizar Animação (Evolução em Tempo Real)", value=True)
+        fps = 0.0
+        if animar:
+            fps = st.slider("Velocidade da Animação (Atraso seg)", 0.0, 0.5, 0.05, step=0.01)
     
     # Área de visualização à direita
     col_metrics, col_chart = st.columns([1, 3])
@@ -258,15 +300,17 @@ def main():
                 while len(new_population) < pop_size:
                     # Seleção
                     if selection_type == "Torneio":
-                        parent1 = selection_tournament(population, distances)
-                        parent2 = selection_tournament(population, distances)
+                        parent1 = selection_tournament(population, distances, k_tournament)
+                        parent2 = selection_tournament(population, distances, k_tournament)
                     else:
                         parent1 = selection_roulette(population, distances)
                         parent2 = selection_roulette(population, distances)
                         
                     # Crossover
                     if random.random() < crossover_rate:
-                        if crossover_type == "OX (Order Crossover)":
+                        if crossover_type == "Uniforme":
+                            child = crossover_uniforme(parent1, parent2)
+                        elif crossover_type == "OX (Order Crossover)":
                             child = crossover_ox(parent1, parent2)
                         else:
                             child = crossover_pmx(parent1, parent2)
