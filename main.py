@@ -7,7 +7,7 @@ import time
 import io
 
 # ---------------------------------------------------------
-# CONFIGURAÇÕES E ESTADOS DA SESSÃO
+# CONFIGURAÇÕES DA SESSÃO
 # ---------------------------------------------------------
 st.set_page_config(page_title="PCV - Algoritmo Genético", layout="wide", initial_sidebar_state="expanded")
 
@@ -20,21 +20,6 @@ K_OPTIONS = {"Baixa (2)": 2, "Média (3)": 3, "Alta (5)": 5}
 
 DEFAULT_SIZE_LABEL = "Médio"
 FRAME_DELAY = 0.05
-
-if "num_cities" not in st.session_state:
-    st.session_state.num_cities = SIZE_OPTIONS[DEFAULT_SIZE_LABEL]
-if "cities" not in st.session_state or not st.session_state.cities:
-    st.session_state.cities = generate_cities(st.session_state.num_cities) # pyright: ignore[reportUndefinedVariable]
-if "best_route" not in st.session_state or not st.session_state.best_route:
-    st.session_state.best_route = list(range(st.session_state.num_cities))
-if "best_distance" not in st.session_state:
-    st.session_state.best_distance = float('inf')
-if "mutations_count" not in st.session_state:
-    st.session_state.mutations_count = 0
-if "generations_count" not in st.session_state:
-    st.session_state.generations_count = 0
-if "running" not in st.session_state:
-    st.session_state.running = False
 
 # ---------------------------------------------------------
 # FUNÇÕES DO ALGORITMO GENÉTICO
@@ -140,6 +125,24 @@ def mutate_inversion(route):
     return route
 
 # ---------------------------------------------------------
+# ESTADOS DA SESSÃO
+# ---------------------------------------------------------
+if "num_cities" not in st.session_state:
+    st.session_state.num_cities = SIZE_OPTIONS[DEFAULT_SIZE_LABEL]
+if "cities" not in st.session_state or not st.session_state.cities:
+    st.session_state.cities = generate_cities(st.session_state.num_cities)
+if "best_route" not in st.session_state or not st.session_state.best_route:
+    st.session_state.best_route = list(range(st.session_state.num_cities))
+if "best_distance" not in st.session_state:
+    st.session_state.best_distance = float('inf')
+if "mutations_count" not in st.session_state:
+    st.session_state.mutations_count = 0
+if "generations_count" not in st.session_state:
+    st.session_state.generations_count = 0
+if "running" not in st.session_state:
+    st.session_state.running = False
+
+# ---------------------------------------------------------
 # RENDERIZAÇÃO GRÁFICA
 # ---------------------------------------------------------
 def plot_route(cities, route, distance, gen):
@@ -229,7 +232,7 @@ def main():
     
     dyn_selection = "<b>Torneio:</b> Escolhe o melhor entre <i>K</i> indivíduos, acelerando a convergência." if selection_type == "Torneio" else "<b>Roleta:</b> Chance proporcional à aptidão, mantendo maior diversidade genética."
     dyn_crossover = "<b>Uniforme:</b> Usa máscara binária, focado na manutenção de variedade." if crossover_type == "Uniforme" else ("<b>OX:</b> Foca em manter trechos em ordem relativa, ideal para PCV." if crossover_type == "OX (Order Crossover)" else "<b>PMX:</b> Mantém posição absoluta das cidades no array, reduzindo colisões de rota.")
-    dyn_mutation = "<b>Inversão:</b> Vira uma seção da rota ao contrário. Essencial no TSP para remover loops sem quebrar a rota inteira." if mutation_type == "Inversão (Recomendado)" else "<b>Swap:</b> Troca apenas 2 cidades aleatórias. Mais lento para otimizar caminhos longos."
+    dyn_mutation = "<b>Inversão:</b> Vira uma seção da rota ao contrário. Essencial no PCV para remover loops sem quebrar a rota inteira." if mutation_type == "Inversão (Recomendado)" else "<b>Swap:</b> Troca apenas 2 cidades aleatórias. Mais lento para otimizar caminhos longos."
 
     dynamic_info_html = f"""
             <div style='background-color: #1e1e1e; padding: 10px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 14px; margin-bottom: 15px;'>
