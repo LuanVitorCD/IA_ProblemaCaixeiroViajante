@@ -4,16 +4,29 @@ import matplotlib.pyplot as plt
 import random
 import math
 import time
+import io
 
 # ---------------------------------------------------------
 # CONFIGURAÇÕES E ESTADOS DA SESSÃO
 # ---------------------------------------------------------
-st.set_page_config(page_title="TSP - Algoritmo Genético", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="PCV - Algoritmo Genético", layout="wide", initial_sidebar_state="expanded")
 
-if "cities" not in st.session_state:
-    st.session_state.cities = []
-if "best_route" not in st.session_state:
-    st.session_state.best_route = []
+SIZE_OPTIONS = {"Pequeno": 10, "Médio": 25, "Grande": 50}
+POP_OPTIONS = {"Pequena (50)": 50, "Média (100)": 100, "Grande (250)": 250}
+GEN_OPTIONS = {"Curto (100)": 100, "Médio (250)": 250, "Longo (500)": 500}
+CROSS_OPTIONS = {"Baixa (70%)": 0.70, "Média (85%)": 0.85, "Alta (95%)": 0.95}
+MUT_OPTIONS = {"Baixa (5%)": 0.05, "Média (15%)": 0.15, "Alta (30%)": 0.30}
+K_OPTIONS = {"Baixa (2)": 2, "Média (3)": 3, "Alta (5)": 5}
+
+DEFAULT_SIZE_LABEL = "Médio"
+FRAME_DELAY = 0.05
+
+if "num_cities" not in st.session_state:
+    st.session_state.num_cities = SIZE_OPTIONS[DEFAULT_SIZE_LABEL]
+if "cities" not in st.session_state or not st.session_state.cities:
+    st.session_state.cities = generate_cities(st.session_state.num_cities) # pyright: ignore[reportUndefinedVariable]
+if "best_route" not in st.session_state or not st.session_state.best_route:
+    st.session_state.best_route = list(range(st.session_state.num_cities))
 if "best_distance" not in st.session_state:
     st.session_state.best_distance = float('inf')
 if "mutations_count" not in st.session_state:
@@ -96,17 +109,15 @@ def crossover_pmx(parent1, parent2):
     return child
 
 def crossover_uniforme(parent1, parent2):
-    """Cruzamento Uniforme (UOX) adaptado para permutação (TSP)."""
+    """Cruzamento Uniforme (UOX) adaptado para permutação (PCV)."""
     size = len(parent1)
     mask = [random.choice([0, 1]) for _ in range(size)]
     child = [-1] * size
     
-    # Passo 1: Herda do pai 1 onde a máscara é 1
     for i in range(size):
         if mask[i] == 1:
             child[i] = parent1[i]
             
-    # Passo 2: Preenche os espaços vazios com os genes do pai 2 (preservando a ordem)
     p2_idx = 0
     for i in range(size):
         if child[i] == -1:
@@ -123,7 +134,7 @@ def mutate_swap(route):
     return route
 
 def mutate_inversion(route):
-    """Inverte um trecho inteiro da rota (muito eficaz para TSP)."""
+    """Inverte um trecho inteiro da rota (muito eficaz para PCV)."""
     start, end = sorted(random.sample(range(len(route)), 2))
     route[start:end] = reversed(route[start:end])
     return route
@@ -135,24 +146,18 @@ def plot_route(cities, route, distance, gen):
     """Gera o gráfico estilizado em tempo real."""
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(8, 8))
-    fig.patch.set_facecolor('#0e1117') # Cor de fundo do Streamlit
+    fig.patch.set_facecolor('#0e1117')
     ax.set_facecolor('#0e1117')
     
     if len(cities) > 0 and len(route) > 0:
         x = [cities[i][0] for i in route] + [cities[route[0]][0]]
         y = [cities[i][1] for i in route] + [cities[route[0]][1]]
         
-        # Desenhar linha neon azulada
         ax.plot(x, y, color='#5ea1ff', linewidth=2, linestyle='-', zorder=1)
-        
-        # Desenhar cidades
         ax.scatter(x, y, color='#ff4d4d', s=80, edgecolors='white', zorder=2)
-        
-        # Destacar ponto de origem (Verde)
         ax.scatter(x[0], y[0], color='#00ff00', s=150, edgecolors='white', zorder=3, label="Início")
 
-    ax.set_title(f"Geração: {gen} | Menor Distância: {distance:.2f}", color='white', fontsize=16, pad=15)
-    ax.axis('off') # Esconde os eixos para ficar bonito
+    ax.axis('off')
     plt.tight_layout()
     return fig
 
@@ -162,56 +167,84 @@ def plot_route(cities, route, distance, gen):
 def main():
     primary_color = st.get_option("theme.primaryColor")
     
-    hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            .stDeployButton {display:none;}
-            .block-container {
-                padding-top: 2rem !important;
-                padding-bottom: 0rem !important;
-            }
-            div {
-            text-align: justify;
+    st.markdown(
+        """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        .stDeployButton {display:none;}
+        .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
+        div { text-align: justify; }
+        [data-testid="stImage"] { display: flex; justify-content: center; align-items: center; width: 100% !important; }
+        [data-testid="stImage"] img {
+            max-height: 75vh !important;
+            width: auto !important;
+            object-fit: contain !important;
+            border-radius: 8px;
         }
         </style>
-        """
-    st.markdown(hide_st_style, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
     title_html = f"""
                 <div style='background-color: #1e1e1e; padding: 5px; border-radius: 5px; border-left: 4px solid {primary_color};'>
-                    <h1 style='font-size: 32px; margin-left: 10px;'><b>Caixeiro Viajante</b><br>
+                    <h1 style='font-size: 32px; margin-left: 10px;'><b>Problema do Caixeiro Viajante</b><br>
                         <i style='font-size: 20px; margin-left: 10px;'><b style='color: {primary_color};'>Grupo: </b> Ana, Luan e Wesley</i>
                     </h1>
                 </div>
                 """
     
     st.sidebar.markdown(title_html, unsafe_allow_html=True)
-
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
     info_html = f"""
             <div style='background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 16px; margin-bottom: 15px;'>
                 <b style='color: #5ea1ff;'>Meta-Heurística: Algoritmo Genético</b><br>
-                O TSP exato tem complexidade <b>O(N!)</b> (NP-Difícil). <br><br>
+                O PCV exato tem complexidade <b>O(N!)</b> (NP-Difícil). <br><br>
                 Nesta aplicação, a IA explora apenas <b>O(População × Gerações)</b> estados, limitando drasticamente o espaço de busca e trocando a garantia da solução perfeita por uma convergência rápida e inteligente.<br><br>
             </div>
             """
-    with st.sidebar.expander("Explicação & Complexidade", expanded=False, icon="ℹ️"):
+    with st.sidebar.expander("Explicação e Complexidade", expanded=False, icon="ℹ️"):
         st.markdown(info_html, unsafe_allow_html=True)
 
     st.sidebar.divider()
 
     st.sidebar.subheader("Técnicas Genéticas (Principais)")
-    selection_type = st.sidebar.selectbox("Método de Seleção", ["Torneio", "Roleta"])
-    crossover_type = st.sidebar.selectbox("Método de Cruzamento", ["Uniforme", "OX (Order Crossover)", "PMX (Partially Mapped)"])
-    mutation_type = st.sidebar.selectbox("Método de Mutação", ["Inversão (Recomendado)", "Swap (Troca Simples)"])
+    selection_type = st.sidebar.selectbox(
+        "Método de Seleção", 
+        ["Torneio", "Roleta"],
+        help="Define como os pais são escolhidos para gerar a próxima geração."
+    )
+    crossover_type = st.sidebar.selectbox(
+        "Método de Cruzamento", 
+        ["Uniforme", "OX (Order Crossover)", "PMX (Partially Mapped)"],
+        help="Define como o material genético de dois pais é combinado."
+    )
+    mutation_type = st.sidebar.selectbox(
+        "Método de Mutação", 
+        ["Inversão (Recomendado)", "Swap (Troca Simples)"],
+        help="Garante diversidade alterando pequenas características das rotas geradas."
+    )
+    
+    dyn_selection = "<b>Torneio:</b> Escolhe o melhor entre <i>K</i> indivíduos, acelerando a convergência." if selection_type == "Torneio" else "<b>Roleta:</b> Chance proporcional à aptidão, mantendo maior diversidade genética."
+    dyn_crossover = "<b>Uniforme:</b> Usa máscara binária, focado na manutenção de variedade." if crossover_type == "Uniforme" else ("<b>OX:</b> Foca em manter trechos em ordem relativa, ideal para PCV." if crossover_type == "OX (Order Crossover)" else "<b>PMX:</b> Mantém posição absoluta das cidades no array, reduzindo colisões de rota.")
+    dyn_mutation = "<b>Inversão:</b> Vira uma seção da rota ao contrário. Essencial no TSP para remover loops sem quebrar a rota inteira." if mutation_type == "Inversão (Recomendado)" else "<b>Swap:</b> Troca apenas 2 cidades aleatórias. Mais lento para otimizar caminhos longos."
+
+    dynamic_info_html = f"""
+            <div style='background-color: #1e1e1e; padding: 10px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 14px; margin-bottom: 15px;'>
+                {dyn_selection}<br><br>
+                {dyn_crossover}<br><br>
+                {dyn_mutation}
+            </div>
+            """
+    
+    with st.sidebar.expander("Detalhes das Técnicas", expanded=False, icon="📖"):
+        st.markdown(dynamic_info_html, unsafe_allow_html=True)
 
     st.sidebar.divider()
-
-    # ---------------------------------------------------------
-    # CORAÇÃO DO SCRIPT - EXECUÇÃO
-    # ---------------------------------------------------------
+    
+    animar = st.sidebar.checkbox("▶️ Ativar Animação", value=True, help="Visualiza o progresso do algoritmo passo a passo.")
     start_btn = st.sidebar.button("Iniciar Evolução", type="primary", use_container_width=True)
 
     st.sidebar.divider()
@@ -219,53 +252,42 @@ def main():
     with st.sidebar.popover("⚙️ Configurações Avançadas", use_container_width=True):
         st.subheader("Mapa de Cidades")
         
-        num_cities = st.slider("Quantidade de Cidades", min_value=5, max_value=100, value=25)
+        cfg_size = st.radio("Tamanho do Mapa", list(SIZE_OPTIONS.keys()), index=1, horizontal=True)
         
-        # Controle do Mapa
-        if len(st.session_state.cities) != num_cities or st.button("🎲 Gerar Novo Mapa Aleatório", use_container_width=True):
-            st.session_state.cities = generate_cities(num_cities)
-            st.session_state.best_route = list(range(num_cities))
+        if st.button("🎲 Gerar Novo Mapa Aleatório", use_container_width=True):
+            st.session_state.num_cities = SIZE_OPTIONS[cfg_size]
+            st.session_state.cities = generate_cities(st.session_state.num_cities)
+            st.session_state.best_route = list(range(st.session_state.num_cities))
             st.session_state.best_distance = route_distance(st.session_state.best_route, st.session_state.cities)
             st.session_state.generations_count = 0
             st.session_state.mutations_count = 0
+            st.rerun()
 
         st.divider()
         st.subheader("Variáveis do Algoritmo Genético")
         
-        pop_size = st.number_input("Tamanho da População", min_value=10, max_value=1000, value=100, step=10)
-        max_gen = st.number_input("Intervalo de Geração (Máx)", min_value=10, max_value=2000, value=200, step=10)
-        crossover_rate = st.slider("Taxa de Cruzamento (%)", 0, 100, 90) / 100.0
-        mutation_rate = st.slider("Taxa de Mutação (%)", 0, 100, 15) / 100.0
-        
-        st.markdown("**Aptidão (Fitness):** Calculada como `1 / Distância Total`. Rotas mais curtas ganham maior probabilidade.")
+        cfg_pop = st.radio("Tamanho da População", list(POP_OPTIONS.keys()), index=1, horizontal=True)
+        pop_size = POP_OPTIONS[cfg_pop]
+
+        cfg_gen = st.radio("Intervalo de Geração (Máx)", list(GEN_OPTIONS.keys()), index=1, horizontal=True)
+        max_gen = GEN_OPTIONS[cfg_gen]
+
+        cfg_cross = st.radio("Taxa de Cruzamento", list(CROSS_OPTIONS.keys()), index=1, horizontal=True)
+        crossover_rate = CROSS_OPTIONS[cfg_cross]
+
+        cfg_mut = st.radio("Taxa de Mutação", list(MUT_OPTIONS.keys()), index=1, horizontal=True)
+        mutation_rate = MUT_OPTIONS[cfg_mut]
         
         k_tournament = 3
         if selection_type == "Torneio":
-            k_tournament = st.slider("Tamanho do Torneio (k)", min_value=2, max_value=10, value=3, help="Define a pressão seletiva. K maior = maior chance de apenas os melhores serem escolhidos.")
-        else:
-            st.info("A seleção por **Roleta** usa probabilidade estrita baseada na aptidão. Não há parâmetros extras para ajustar.")
-            
-        if crossover_type == "Uniforme":
-            st.info("O **Cruzamento Uniforme** para TSP (UOX) utiliza uma máscara binária aleatória para mesclar as cidades. Evita cidades duplicadas preenchendo os espaços vazios seguindo a ordem do segundo pai.")
-            
-        if mutation_type == "Swap (Troca Simples)":
-            st.warning("A Mutação **Swap** é geralmente mais fraca para o TSP do que a Inversão, pois destrói conexões úteis na rota repetidas vezes de forma ineficiente.")
+            cfg_k = st.radio("Tamanho do Torneio (k)", list(K_OPTIONS.keys()), index=1, horizontal=True)
+            k_tournament = K_OPTIONS[cfg_k]
 
-        st.divider()
-        st.subheader("Opções de Performance")
-        animar = st.toggle("Visualizar Animação (Evolução em Tempo Real)", value=True)
-        fps = 0.0
-        if animar:
-            fps = st.slider("Velocidade da Animação (Atraso seg)", 0.0, 0.5, 0.05, step=0.01)
+    # Obter a contagem final atual de cidades para o loop
+    num_cities = st.session_state.num_cities
     
-    # Área de visualização à direita
     col_metrics, col_chart = st.columns([1, 3])
     
-    with col_chart:
-        chart_placeholder = st.empty()
-        # Mostra o mapa inicial
-        chart_placeholder.pyplot(plot_route(st.session_state.cities, st.session_state.best_route, st.session_state.best_distance, st.session_state.generations_count))
-        
     with col_metrics:
         st.subheader("Estatísticas")
         metric_dist = st.empty()
@@ -276,7 +298,16 @@ def main():
         metric_gen.metric("Geração Atual", st.session_state.generations_count)
         metric_mut.metric("Mutações Ocorridas", st.session_state.mutations_count)
 
-    # LOOP PRINCIPAL DA IA
+    with col_chart:
+        chart_placeholder = st.empty()
+        
+        fig = plot_route(st.session_state.cities, st.session_state.best_route, st.session_state.best_distance, st.session_state.generations_count)
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), pad_inches=0.1)
+        buf.seek(0)
+        chart_placeholder.image(buf)
+        plt.close(fig)
+
     if start_btn:
         population = init_population(pop_size, num_cities)
         best_overall_route = []
@@ -285,20 +316,16 @@ def main():
         
         with st.spinner("Evoluindo população..."):
             for gen in range(1, max_gen + 1):
-                # 1. Aptidão
                 distances = [route_distance(ind, st.session_state.cities) for ind in population]
                 
-                # Elitismo: Salvar o melhor da geração
                 min_dist_idx = distances.index(min(distances))
                 if distances[min_dist_idx] < best_overall_dist:
                     best_overall_dist = distances[min_dist_idx]
                     best_overall_route = population[min_dist_idx][:]
                     
-                new_population = [best_overall_route] # Mantém o melhor absoluto na nova geração
+                new_population = [best_overall_route]
                 
-                # 2. Reprodução (Seleção + Crossover + Mutação)
                 while len(new_population) < pop_size:
-                    # Seleção
                     if selection_type == "Torneio":
                         parent1 = selection_tournament(population, distances, k_tournament)
                         parent2 = selection_tournament(population, distances, k_tournament)
@@ -306,7 +333,6 @@ def main():
                         parent1 = selection_roulette(population, distances)
                         parent2 = selection_roulette(population, distances)
                         
-                    # Crossover
                     if random.random() < crossover_rate:
                         if crossover_type == "Uniforme":
                             child = crossover_uniforme(parent1, parent2)
@@ -317,7 +343,6 @@ def main():
                     else:
                         child = parent1[:]
                         
-                    # Mutação
                     if random.random() < mutation_rate:
                         total_mutations += 1
                         if mutation_type == "Inversão (Recomendado)":
@@ -329,13 +354,11 @@ def main():
                     
                 population = new_population
                 
-                # Atualizar Interface e Session State
                 st.session_state.best_distance = best_overall_dist
                 st.session_state.best_route = best_overall_route
                 st.session_state.generations_count = gen
                 st.session_state.mutations_count = total_mutations
 
-                # Controle de Performance: Renderiza a cada 5 gerações na animação, ou apenas no final
                 if animar:
                     if gen % 5 == 0 or gen == max_gen:
                         metric_dist.metric("Melhor Distância", f"{best_overall_dist:.2f}", delta=f"Geração {gen}")
@@ -343,23 +366,27 @@ def main():
                         metric_mut.metric("Mutações Ocorridas", total_mutations)
                         
                         fig = plot_route(st.session_state.cities, best_overall_route, best_overall_dist, gen)
-                        chart_placeholder.pyplot(fig)
-                        plt.close(fig) # Liberar memória
-                        if fps > 0:
-                            time.sleep(fps)
+                        buf = io.BytesIO()
+                        fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), pad_inches=0.1)
+                        buf.seek(0)
+                        chart_placeholder.image(buf)
+                        plt.close(fig)
+                        
+                        time.sleep(FRAME_DELAY)
                             
-            # Renderização Final Obrigatória
             if not animar:
                 metric_dist.metric("Melhor Distância", f"{best_overall_dist:.2f}", delta="Concluído")
                 metric_gen.metric("Geração Atual", f"{max_gen} / {max_gen}")
                 metric_mut.metric("Mutações Ocorridas", total_mutations)
                 
                 fig = plot_route(st.session_state.cities, best_overall_route, best_overall_dist, max_gen)
-                chart_placeholder.pyplot(fig)
+                buf = io.BytesIO()
+                fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), pad_inches=0.1)
+                buf.seek(0)
+                chart_placeholder.image(buf)
                 plt.close(fig)
                 
             st.success(f"Evolução concluída! Melhor distância alcançada: {best_overall_dist:.2f}")
 
 if __name__ == "__main__":
     main()
-    
