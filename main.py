@@ -186,7 +186,7 @@ def main():
             border-radius: 8px;
         }
         section[data-testid="stSidebar"] {
-            width: 500px !important;
+            min-width: 500px !important;
         }
         </style>
         """,
