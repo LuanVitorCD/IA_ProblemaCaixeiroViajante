@@ -9,7 +9,7 @@ import io
 # ---------------------------------------------------------
 # CONFIGURAÇÕES DA SESSÃO
 # ---------------------------------------------------------
-st.set_page_config(page_title="PCV - Algoritmo Genético", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="PCV - Algoritmo Genético", layout="wide", page_icon="🧬", initial_sidebar_state="expanded")
 
 SIZE_OPTIONS = {"Pequeno": 10, "Médio": 25, "Grande": 50}
 POP_OPTIONS = {"Pequena (50)": 50, "Média (100)": 100, "Grande (250)": 250}
@@ -38,63 +38,102 @@ def route_distance(route, cities):
         dist += calc_distance(cities[route[i]], cities[route[(i + 1) % len(route)]])
     return dist
 
+def calculate_fitness(distance):
+    """
+    Transforma a distância (minimização) em Aptidão/Fitness (maximização).
+    Soluções com menor distância terão maior aptidão.
+    """
+    if distance == 0: 
+        return float('inf')
+    return 10000.0 / distance
+
 def init_population(pop_size, num_cities):
-    """Gera a população inicial com rotas aleatórias."""
+    """Gera a população inicial com rotas aleatórias (Cromossomos)."""
     return [random.sample(range(num_cities), num_cities) for _ in range(pop_size)]
 
 # SELEÇÃO
 def selection_tournament(pop, fitnesses, k=3):
-    """Seleciona o melhor entre K indivíduos aleatórios."""
+    """Torneio: Seleciona aleatoriamente k indivíduos e escolhe o de maior Aptidão."""
     selected = random.sample(list(zip(pop, fitnesses)), k)
-    return min(selected, key=lambda x: x[1])[0]
+    # Como a aptidão (fitness) maior é melhor, pegamos o máximo
+    return max(selected, key=lambda x: x[1])[0]
 
 def selection_roulette(pop, fitnesses):
-    """Roleta viciada: chances proporcionais à aptidão (1/distância)."""
-    inv_fit = [1.0 / f for f in fitnesses]
-    total_fit = sum(inv_fit)
+    """Roleta Tradicional: Chance proporcional à Aptidão (Fitness) do indivíduo."""
+    total_fit = sum(fitnesses)
     pick = random.uniform(0, total_fit)
     current = 0
-    for ind, fit in zip(pop, inv_fit):
+    for ind, fit in zip(pop, fitnesses):
         current += fit
         if current > pick:
             return ind
     return pop[-1]
 
-# CRUZAMENTO (CROSSOVER)
-def crossover_ox(parent1, parent2):
-    """Order Crossover (OX) - Preserva ordem relativa."""
-    size = len(parent1)
-    start, end = sorted(random.sample(range(size), 2))
-    child = [-1] * size
-    child[start:end] = parent1[start:end]
-    p2_idx, c_idx = end, end
-    while -1 in child:
-        if parent2[p2_idx % size] not in child:
-            child[c_idx % size] = parent2[p2_idx % size]
-            c_idx += 1
-        p2_idx += 1
-    return child
+def selection_linear_ranking(pop, fitnesses):
+    """
+    Ranking Linear: Ordena pela aptidão e dá probabilidade baseada na posição.
+    Minimiza problemas de 'Roleta Viciada' quando um indivíduo é absurdamente melhor que o resto.
+    """
+    pop_fit = list(zip(pop, fitnesses))
+    # Ordena do pior (menor fitness) pro melhor (maior fitness)
+    pop_fit.sort(key=lambda x: x[1])
+    
+    n = len(pop)
+    # Atribui pesos lineares: o pior ganha peso 1, o segundo 2... o melhor ganha peso N
+    weights = list(range(1, n + 1))
+    total_weight = sum(weights)
+    
+    pick = random.uniform(0, total_weight)
+    current = 0
+    for i, weight in enumerate(weights):
+        current += weight
+        if current > pick:
+            return pop_fit[i][0]
+    return pop_fit[-1][0]
 
-def crossover_pmx(parent1, parent2):
-    """Partially Mapped Crossover (PMX)."""
+def selection_truncated(pop, fitnesses, fraction=0.5):
+    """
+    Truncada: Apenas uma fração (ex: 50%) dos melhores participa da seleção aleatória.
+    """
+    pop_fit = list(zip(pop, fitnesses))
+    # Ordena do melhor pro pior (maior fitness pro menor)
+    pop_fit.sort(key=lambda x: x[1], reverse=True)
+    
+    # Pega apenas os melhores
+    cut_idx = max(1, int(len(pop) * fraction))
+    elite_pool = [ind for ind, fit in pop_fit[:cut_idx]]
+    
+    # Escolhe um aleatório dessa elite
+    return random.choice(elite_pool)
+
+# CRUZAMENTO (CROSSOVER)
+def crossover_um_ponto_correcao(parent1, parent2):
+    """
+    Cruzamento de 1 Ponto com Correção.
+    Corta no meio, pega a primeira metade do Pai 1. 
+    Para a segunda metade, usa a ordem do Pai 2 para preencher as cidades que faltam.
+    """
     size = len(parent1)
+    point = size // 2 
+    
     child = [-1] * size
-    start, end = sorted(random.sample(range(size), 2))
-    child[start:end] = parent1[start:end]
-    for i in range(start, end):
-        if parent2[i] not in child:
-            spot = i
-            while start <= spot < end:
-                val = parent1[spot]
-                spot = parent2.index(val)
-            child[spot] = parent2[i]
-    for i in range(size):
-        if child[i] == -1:
-            child[i] = parent2[i]
+    
+    # Primeira metade do Pai 1
+    child[:point] = parent1[:point]
+    
+    # Cidades que ainda não estão no filho
+    missing = [c for c in parent2 if c not in child]
+    
+    # Preenche o resto com as cidades faltantes mantendo a ordem que aparecem no Pai 2
+    m_idx = 0
+    for i in range(point, size):
+        child[i] = missing[m_idx]
+        m_idx += 1
+            
     return child
 
 def crossover_uniforme(parent1, parent2):
-    """Cruzamento Uniforme (UOX) adaptado para permutação (PCV)."""
+    """Cruzamento Uniforme (UOX) - Usa máscara binária e corrige duplicatas."""
     size = len(parent1)
     mask = [random.choice([0, 1]) for _ in range(size)]
     child = [-1] * size
@@ -113,15 +152,9 @@ def crossover_uniforme(parent1, parent2):
 
 # MUTAÇÃO
 def mutate_swap(route):
-    """Troca duas cidades de lugar."""
+    """Mutação Swap (Troca): Altera genes trocando duas cidades de lugar."""
     idx1, idx2 = random.sample(range(len(route)), 2)
     route[idx1], route[idx2] = route[idx2], route[idx1]
-    return route
-
-def mutate_inversion(route):
-    """Inverte um trecho inteiro da rota (muito eficaz para PCV)."""
-    start, end = sorted(random.sample(range(len(route)), 2))
-    route[start:end] = reversed(route[start:end])
     return route
 
 # ---------------------------------------------------------
@@ -186,7 +219,16 @@ def main():
             border-radius: 8px;
         }
         section[data-testid="stSidebar"] {
-            min-width: 500px !important;
+            width: 500px !important;
+        }
+        section[data-testid="stSidebar"] > div:not([data-testid="stSidebarContent"]) {
+            display: none !important;
+            width: 0px !important;
+            pointer-events: none !important;
+        }
+        div[data-testid="stSidebarCollapseButton"] {
+            display: inline !important;
+            visibility: inline !important;
         }
         </style>
         """,
@@ -204,11 +246,14 @@ def main():
     st.sidebar.markdown(title_html, unsafe_allow_html=True)
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
+    # Texto de Explicação + Informação sobre a Mutação Fixa
     info_html = f"""
             <div style='background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 16px; margin-bottom: 15px;'>
                 <b style='color: #5ea1ff;'>Meta-Heurística: Algoritmo Genético</b><br>
                 O PCV exato tem complexidade <b>O(N!)</b> (NP-Difícil). <br><br>
                 Nesta aplicação, a IA explora apenas <b>O(População × Gerações)</b> estados, limitando drasticamente o espaço de busca e trocando a garantia da solução perfeita por uma convergência rápida e inteligente.<br><br>
+                <b>🔄 Sobre a Mutação:</b><br>
+                Para manter alinhamento aos conceitos base, esta aplicação fixa o método de mutação no formato <b>Swap (Troca Simples)</b>. A cada geração, há uma chance de ocorrer uma troca de posição entre duas cidades aleatórias da rota, alterando seus genes e garantindo a diversidade genética da população.
             </div>
             """
     with st.sidebar.expander("Explicação e Complexidade", expanded=False, icon="ℹ️"):
@@ -219,29 +264,41 @@ def main():
     st.sidebar.subheader("Técnicas Genéticas (Principais)")
     selection_type = st.sidebar.selectbox(
         "Método de Seleção", 
-        ["Torneio", "Roleta"],
-        help="Define como os pais são escolhidos para gerar a próxima geração."
+        ["Torneio", "Roleta", "Ranking Linear", "Truncada"],
+        help="Define como os pais são escolhidos para gerar a próxima geração. Usa a Aptidão (Fitness)."
     )
     crossover_type = st.sidebar.selectbox(
-        "Método de Cruzamento", 
-        ["Uniforme", "OX (Order Crossover)", "PMX (Partially Mapped)"],
-        help="Define como o material genético de dois pais é combinado."
-    )
-    mutation_type = st.sidebar.selectbox(
-        "Método de Mutação", 
-        ["Inversão (Recomendado)", "Swap (Troca Simples)"],
-        help="Garante diversidade alterando pequenas características das rotas geradas."
+        "Método de Cruzamento (Crossover)", 
+        ["1 Ponto (Com Correção)", "Uniforme"],
+        help="Define como o material genético (genes) de dois pais é combinado para gerar o filho."
     )
     
-    dyn_selection = "<b>Torneio:</b> Escolhe o melhor entre <i>K</i> indivíduos, acelerando a convergência." if selection_type == "Torneio" else "<b>Roleta:</b> Chance proporcional à aptidão, mantendo maior diversidade genética."
-    dyn_crossover = "<b>Uniforme:</b> Usa máscara binária, focado na manutenção de variedade." if crossover_type == "Uniforme" else ("<b>OX:</b> Foca em manter trechos em ordem relativa, ideal para PCV." if crossover_type == "OX (Order Crossover)" else "<b>PMX:</b> Mantém posição absoluta das cidades no array, reduzindo colisões de rota.")
-    dyn_mutation = "<b>Inversão:</b> Vira uma seção da rota ao contrário. Essencial no PCV para remover loops sem quebrar a rota inteira." if mutation_type == "Inversão (Recomendado)" else "<b>Swap:</b> Troca apenas 2 cidades aleatórias. Mais lento para otimizar caminhos longos."
+    # Elitismo movido para o menu principal
+    ativar_elitismo = st.sidebar.checkbox(
+        "👑 Ativar Elitismo (Manter melhor indivíduo)", 
+        value=True, 
+        help="Garante que a melhor solução da geração anterior passe direto para a próxima geração sem sofrer mutação ou cruzamento."
+    )
+    
+    # Textos descritivos dinâmicos atualizados (apenas para Seleção e Cruzamento)
+    if selection_type == "Torneio":
+        dyn_selection = "<b>Torneio:</b> Escolhe o melhor entre <i>K</i> indivíduos aleatórios, aumentando a pressão de seleção."
+    elif selection_type == "Roleta":
+        dyn_selection = "<b>Roleta:</b> Chance de seleção é proporcional ao valor da Aptidão (Fitness) do indivíduo."
+    elif selection_type == "Ranking Linear":
+        dyn_selection = "<b>Ranking Linear:</b> Ordena a população e seleciona baseado na posição, evitando a Roleta Viciada."
+    else:
+        dyn_selection = "<b>Truncada:</b> Apenas os melhores indivíduos da população participam do processo de seleção."
+
+    if crossover_type == "1 Ponto (Com Correção)":
+        dyn_crossover = "<b>1 Ponto:</b> Corta no meio e corrige preenchendo as cidades faltantes baseadas na ordem do segundo pai."
+    else:
+        dyn_crossover = "<b>Uniforme:</b> Usa uma máscara para decidir de qual pai virá cada gene, com correção de repetidos."
 
     dynamic_info_html = f"""
             <div style='background-color: #1e1e1e; padding: 10px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 14px; margin-bottom: 15px;'>
                 {dyn_selection}<br><br>
-                {dyn_crossover}<br><br>
-                {dyn_mutation}
+                {dyn_crossover}
             </div>
             """
     
@@ -275,7 +332,7 @@ def main():
         cfg_pop = st.radio("Tamanho da População", list(POP_OPTIONS.keys()), index=1, horizontal=True)
         pop_size = POP_OPTIONS[cfg_pop]
 
-        cfg_gen = st.radio("Intervalo de Geração (Máx)", list(GEN_OPTIONS.keys()), index=1, horizontal=True)
+        cfg_gen = st.radio("Limite de Gerações (Critério de Parada)", list(GEN_OPTIONS.keys()), index=1, horizontal=True)
         max_gen = GEN_OPTIONS[cfg_gen]
 
         cfg_cross = st.radio("Taxa de Cruzamento", list(CROSS_OPTIONS.keys()), index=1, horizontal=True)
@@ -286,8 +343,12 @@ def main():
         
         k_tournament = 3
         if selection_type == "Torneio":
-            cfg_k = st.radio("Tamanho do Torneio (k)", list(K_OPTIONS.keys()), index=1, horizontal=True)
+            cfg_k = st.radio("Tamanho do Torneio (K)", list(K_OPTIONS.keys()), index=1, horizontal=True)
             k_tournament = K_OPTIONS[cfg_k]
+
+        st.divider()
+        st.subheader("Critérios de Parada Extras")
+        distancia_alvo = st.number_input("Distância Alvo (Solução Satisfatória)", value=0.0, step=10.0, help="O algoritmo encerra se encontrar uma 'Solução Satisfatória' (menor ou igual a este valor). Deixe 0.0 para ignorar e rodar até o Limite de Gerações.")
 
     # Obter a contagem final atual de cidades para o loop
     num_cities = st.session_state.num_cities
@@ -315,6 +376,7 @@ def main():
         plt.close(fig)
 
     if start_btn:
+        # INÍCIO: Gerar População Inicial
         population = init_population(pop_size, num_cities)
         best_overall_route = []
         best_overall_dist = float('inf')
@@ -322,51 +384,71 @@ def main():
         
         with st.spinner("Evoluindo população..."):
             for gen in range(1, max_gen + 1):
+                # AVALIAÇÃO: Calcular Custo (Distância) e Aptidão (Fitness)
                 distances = [route_distance(ind, st.session_state.cities) for ind in population]
+                fitnesses = [calculate_fitness(d) for d in distances]
                 
                 min_dist_idx = distances.index(min(distances))
                 if distances[min_dist_idx] < best_overall_dist:
                     best_overall_dist = distances[min_dist_idx]
                     best_overall_route = population[min_dist_idx][:]
                     
-                new_population = [best_overall_route]
+                # CRITÉRIO DE PARADA: Solução satisfatória atingida
+                if distancia_alvo > 0 and best_overall_dist <= distancia_alvo:
+                    st.toast(f"Critério de parada atingido! Distância ≤ {distancia_alvo}", icon="🛑")
+                    break
+                    
+                # SUBSTITUIR POPULAÇÃO ANTERIOR
+                new_population = []
+                
+                # ELITISMO
+                if ativar_elitismo:
+                    new_population.append(best_overall_route)
                 
                 while len(new_population) < pop_size:
+                    # SELEÇÃO DE PAIS
                     if selection_type == "Torneio":
-                        parent1 = selection_tournament(population, distances, k_tournament)
-                        parent2 = selection_tournament(population, distances, k_tournament)
-                    else:
-                        parent1 = selection_roulette(population, distances)
-                        parent2 = selection_roulette(population, distances)
+                        parent1 = selection_tournament(population, fitnesses, k_tournament)
+                        parent2 = selection_tournament(population, fitnesses, k_tournament)
+                    elif selection_type == "Roleta":
+                        parent1 = selection_roulette(population, fitnesses)
+                        parent2 = selection_roulette(population, fitnesses)
+                    elif selection_type == "Ranking Linear":
+                        parent1 = selection_linear_ranking(population, fitnesses)
+                        parent2 = selection_linear_ranking(population, fitnesses)
+                    else: # Truncada
+                        parent1 = selection_truncated(population, fitnesses)
+                        parent2 = selection_truncated(population, fitnesses)
                         
+                    # CRUZAMENTO (CROSSOVER)
                     if random.random() < crossover_rate:
-                        if crossover_type == "Uniforme":
-                            child = crossover_uniforme(parent1, parent2)
-                        elif crossover_type == "OX (Order Crossover)":
-                            child = crossover_ox(parent1, parent2)
+                        if crossover_type == "1 Ponto (Com Correção)":
+                            child = crossover_um_ponto_correcao(parent1, parent2)
                         else:
-                            child = crossover_pmx(parent1, parent2)
+                            child = crossover_uniforme(parent1, parent2)
                     else:
                         child = parent1[:]
                         
+                    # MUTAÇÃO
                     if random.random() < mutation_rate:
                         total_mutations += 1
-                        if mutation_type == "Inversão (Recomendado)":
-                            child = mutate_inversion(child)
-                        else:
-                            child = mutate_swap(child)
+                        # Usando estritamente a mutação Swap (apresentada como "alterar genes")
+                        child = mutate_swap(child)
                             
                     new_population.append(child)
                     
+                # Nova Geração Assume
                 population = new_population
                 
+                # Atualizar estados e UI
                 st.session_state.best_distance = best_overall_dist
                 st.session_state.best_route = best_overall_route
                 st.session_state.generations_count = gen
                 st.session_state.mutations_count = total_mutations
 
                 if animar:
-                    if gen % 5 == 0 or gen == max_gen:
+                    # Renderizar gráficos intercalados para não pesar muito
+                    if gen % 5 == 0 or gen == max_gen or (distancia_alvo > 0 and best_overall_dist <= distancia_alvo):
                         metric_dist.metric("Melhor Distância", f"{best_overall_dist:.2f}", delta=f"Geração {gen}")
                         metric_gen.metric("Geração Atual", f"{gen} / {max_gen}")
                         metric_mut.metric("Mutações Ocorridas", total_mutations)
@@ -380,12 +462,13 @@ def main():
                         
                         time.sleep(FRAME_DELAY)
                             
+            # FIM: Quando terminar todas as gerações (ou parar antes)
             if not animar:
                 metric_dist.metric("Melhor Distância", f"{best_overall_dist:.2f}", delta="Concluído")
-                metric_gen.metric("Geração Atual", f"{max_gen} / {max_gen}")
+                metric_gen.metric("Geração Atual", f"{gen} / {max_gen}")
                 metric_mut.metric("Mutações Ocorridas", total_mutations)
                 
-                fig = plot_route(st.session_state.cities, best_overall_route, best_overall_dist, max_gen)
+                fig = plot_route(st.session_state.cities, best_overall_route, best_overall_dist, gen)
                 buf = io.BytesIO()
                 fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), pad_inches=0.1)
                 buf.seek(0)
