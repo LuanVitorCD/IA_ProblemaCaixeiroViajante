@@ -1,15 +1,12 @@
-# Problema do Caixeiro Viajante com Algoritmos Genéticos 🧬
-
-Este repositório contém o projeto final da disciplina de Inteligência Artificial, desenvolvido pelo grupo **Ana, Luan e Wesley**. O objetivo principal é resolver o clássico Problema do Caixeiro Viajante (PCV) utilizando uma meta-heurística baseada em **Algoritmos Genéticos**.
+# Problema do Caixeiro Viajante com Algoritmos Genéticos
 
 ## 📌 Sobre o Projeto
 
-O **Problema do Caixeiro Viajante (PCV)** é um desafio clássico de otimização combinatória. A premissa é simples: dado um conjunto de cidades e a distância entre cada par de cidades, qual é a menor rota possível que visita cada cidade exatamente uma vez e retorna à cidade de origem?
-Por ser um problema *NP-Difícil*, encontrar a solução exata testando todas as combinações (força bruta) tem complexidade $O(N!)$, tornando-se inviável computacionalmente para um grande número de cidades.
+O **Problema do Caixeiro Viajante (PCV)** é um desafio clássico de otimização combinatória. A premissa é simples: dado um conjunto de cidades e a distância entre cada par de cidades, qual é a menor rota possível que visita cada cidade exatamente uma vez e retorna à cidade de origem? Por ser um problema *NP-Difícil*, encontrar a solução exata testando todas as combinações (força bruta) tem complexidade $O(N!)$, tornando-se inviável computacionalmente para um grande número de cidades.
 
 Para contornar esse problema, utilizamos **Algoritmos Genéticos**, uma técnica que não garante a rota perfeita, mas encontra soluções altamente otimizadas em um tempo muito menor, explorando apenas $O(\text{População} \times \text{Gerações})$ estados possíveis.
 
-## 🧬 O que são Algoritmos Genéticos?
+## 🧬 Definição de Algoritmos Genéticos
 
 Algoritmos Genéticos (AG), propostos por John Henry Holland (1975), são métodos de otimização e busca heurística inspirados nos mecanismos de evolução natural de Charles Darwin. Eles operam sobre uma população inicial de possíveis soluções e as evoluem através de gerações.
 
@@ -30,7 +27,7 @@ A analogia com sistemas naturais funciona da seguinte forma:
 6.  **Mutação:** Alteração aleatória em um ou mais genes do filho gerado para manter a diversidade genética da população e evitar que o algoritmo fique preso em mínimos locais.
 7.  **Substituição:** A nova geração de filhos substitui a geração anterior e o ciclo se repete a partir da Avaliação (passo 2).
 
-## ⚙️ Como os Algoritmos Genéticos foram implementados neste projeto
+## ⚙️ Implementação dos Algoritmos Genéticos
 
 A aplicação implementa os conceitos teóricos de Algoritmos Genéticos em Python. Abaixo detalhamos como cada etapa ocorre no código:
 
@@ -94,17 +91,17 @@ IA_ProblemaCaixeiroViajante/
 └── requirements.txt     # Lista de dependências (bibliotecas) necessárias para rodar o projeto
 ```
 
-## 💻 Como rodar localmente
+## 💻 Execução Local
 
 Siga os passos abaixo para executar a aplicação no seu computador:
 
 1.  **Clone este repositório:**
     ```bash
-    git clone https://github.com/seu-usuario/IA_ProblemaCaixeiroViajante.git
+    git clone https://github.com/LuanVitorCD/IA_ProblemaCaixeiroViajante.git
     cd IA_ProblemaCaixeiroViajante
     ```
 
-2.  **Crie e ative um ambiente virtual (Recomendado):**
+2.  **Crie e ative um ambiente virtual (recomendado):**
     *   No Windows:
         ```bash
         python -m venv venv
@@ -117,6 +114,7 @@ Siga os passos abaixo para executar a aplicação no seu computador:
         ```
 
 3.  **Instale as dependências:**
+    
     Certifique-se de estar com o ambiente virtual ativado e execute:
     ```bash
     pip install -r requirements.txt
@@ -128,5 +126,4 @@ Siga os passos abaixo para executar a aplicação no seu computador:
     streamlit run main.py
     ```
 
-5.  **Acesse a interface:**
-    O Streamlit abrirá uma nova aba no seu navegador automaticamente (geralmente em `http://localhost:8501`). Se não abrir, basta copiar o link gerado no terminal e colar no seu navegador.
+5.  **Acesse a interface:** O Streamlit abrirá uma nova aba no seu navegador automaticamente (geralmente em `http://localhost:8501`). Se não abrir, basta copiar o link gerado no terminal e colar no seu navegador.
