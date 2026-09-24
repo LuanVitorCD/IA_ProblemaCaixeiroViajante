@@ -83,8 +83,6 @@ IA_ProblemaCaixeiroViajante/
 ├── .devcontainer/       # Configurações de ambiente de desenvolvimento (Docker/VSCode)
 ├── .streamlit/          
 │   └── config.toml      # Configurações de tema e exibição do Streamlit
-├── .vscode/             # Configurações locais do editor VSCode
-├── venv/                # Ambiente virtual do Python com as dependências instaladas
 ├── .gitignore           # Arquivos ignorados pelo controle de versão do Git
 ├── main.py              # Código principal da aplicação contendo as lógicas do AG e interface
 ├── README.md            # Este arquivo de documentação
