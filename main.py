@@ -201,6 +201,17 @@ def plot_route(cities, route, distance, gen):
 # INTERFACE PRINCIPAL
 # ---------------------------------------------------------
 def main():
+
+    if st.session_state.get("reset_requested", False):
+        st.session_state.map_size = "Médio"
+        st.session_state.num_cities = SIZE_OPTIONS["Médio"]
+        st.session_state.cities = generate_cities(st.session_state.num_cities)
+        st.session_state.best_route = list(range(st.session_state.num_cities))
+        st.session_state.best_distance = route_distance(st.session_state.best_route, st.session_state.cities)
+        st.session_state.generations_count = 0
+        st.session_state.mutations_count = 0
+        st.session_state.reset_requested = False
+
     primary_color = st.get_option("theme.primaryColor")
     
     st.markdown(
@@ -213,13 +224,16 @@ def main():
         div { text-align: left; }
         [data-testid="stImage"] { display: flex; justify-content: center; align-items: center; width: 100% !important; }
         [data-testid="stImage"] img {
-            max-height: 75vh !important;
-            width: auto !important;
+            max-height: 80vh !important;
+            width: 80vw !important;
             object-fit: contain !important;
             border-radius: 8px;
         }
         section[data-testid="stSidebar"] {
             width: 500px !important;
+        }
+        [data-testid="stSidebarContent"] {
+            overflow-y: hidden !important;
         }
         section[data-testid="stSidebar"] > div:not([data-testid="stSidebarContent"]) {
             display: none !important;
@@ -229,6 +243,30 @@ def main():
         div[data-testid="stSidebarCollapseButton"] {
             display: inline !important;
             visibility: inline !important;
+        }
+        button[data-testid="stPopoverButton"]{
+            border: 1px solid rgba(57, 119, 255, 0.5) !important;
+            border-radius: 10px !important;
+            justify-content: space-between;
+        }
+        button[data-testid="stPopoverButton"] > div[data-testid="stMarkdownContainer"] {
+            width: 100%;
+        }
+        span[data-testid="stIconMaterial"]{
+            color: rgb(57, 119, 255) !important;
+        }
+        [data-testid="stMetric"]{
+            background-color: #191c20;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        [data-testid="stMetricLabel"]{
+            font-size: 20px;
+        }
+        div[data-testid="stMetricValue"]{
+            font-size: 20px;
         }
         </style>
         """,
@@ -256,12 +294,39 @@ def main():
                 Para manter alinhamento aos conceitos base, esta aplicação fixa o método de mutação no formato <b>Swap (Troca Simples)</b>. A cada geração, há uma chance de ocorrer uma troca de posição entre duas cidades aleatórias da rota, alterando seus genes e garantindo a diversidade genética da população.
             </div>
             """
-    with st.sidebar.expander("Explicação e Complexidade", expanded=False, icon="ℹ️"):
+    with st.sidebar.popover("Explicação e Complexidade", icon=":material/chat_info:", use_container_width=True):
         st.markdown(info_html, unsafe_allow_html=True)
 
-    st.sidebar.divider()
+    # Divisor customizado com margens reduzidas (10px em cima e em baixo)
+    custom_divider = """
+        <hr style="margin-top: 10px; margin-bottom: 25px; border: none; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+    """
 
-    st.sidebar.subheader("Técnicas Genéticas (Principais)")
+    st.sidebar.markdown(custom_divider, unsafe_allow_html=True)
+
+    if "map_size" not in st.session_state:
+        st.session_state.map_size = "Médio"
+
+    with st.sidebar.form("map_config_form"):
+        st.subheader("Mapa de Cidades")
+        cfg_size = st.radio("Tamanho do Mapa", list(SIZE_OPTIONS.keys()), key="map_size", horizontal=True)
+
+        col_apply, col_reset = st.columns(2)    
+        aplicar = col_apply.form_submit_button(":material/check: Aplicar e Gerar", type="primary", use_container_width=True)
+        resetar = col_reset.form_submit_button("↺ Resetar", use_container_width=True)
+
+    if aplicar:
+        st.session_state.num_cities = SIZE_OPTIONS[cfg_size]
+        st.session_state.cities = generate_cities(st.session_state.num_cities)
+        st.session_state.best_route = list(range(st.session_state.num_cities))
+        st.session_state.best_distance = route_distance(st.session_state.best_route, st.session_state.cities)
+        st.session_state.generations_count = 0
+        st.session_state.mutations_count = 0
+        st.rerun()
+    elif resetar:
+        st.session_state.reset_requested = True
+        st.rerun()
+
     selection_type = st.sidebar.selectbox(
         "Método de Seleção", 
         ["Torneio", "Roleta", "Ranking Linear", "Truncada"],
@@ -272,61 +337,12 @@ def main():
         ["1 Ponto (Com Correção)", "Uniforme"],
         help="Define como o material genético (genes) de dois pais é combinado para gerar o filho."
     )
-    
-    # Elitismo movido para o menu principal
-    ativar_elitismo = st.sidebar.checkbox(
-        "👑 Ativar Elitismo (Manter melhor indivíduo)", 
-        value=True, 
-        help="Garante que a melhor solução da geração anterior passe direto para a próxima geração sem sofrer mutação ou cruzamento."
-    )
-    
-    # Textos descritivos dinâmicos atualizados (apenas para Seleção e Cruzamento)
-    if selection_type == "Torneio":
-        dyn_selection = "<b>Torneio:</b> Escolhe o melhor entre <i>K</i> indivíduos aleatórios, aumentando a pressão de seleção."
-    elif selection_type == "Roleta":
-        dyn_selection = "<b>Roleta:</b> Chance de seleção é proporcional ao valor da Aptidão (Fitness) do indivíduo."
-    elif selection_type == "Ranking Linear":
-        dyn_selection = "<b>Ranking Linear:</b> Ordena a população e seleciona baseado na posição, evitando a Roleta Viciada."
-    else:
-        dyn_selection = "<b>Truncada:</b> Apenas os melhores indivíduos da população participam do processo de seleção."
 
-    if crossover_type == "1 Ponto (Com Correção)":
-        dyn_crossover = "<b>1 Ponto:</b> Corta no meio e corrige preenchendo as cidades faltantes baseadas na ordem do segundo pai."
-    else:
-        dyn_crossover = "<b>Uniforme:</b> Usa uma máscara para decidir de qual pai virá cada gene, com correção de repetidos."
+    ativar_elitismo = st.sidebar.toggle( ":primary[:material/crown:] Ativar Elitismo (Manter melhor indivíduo)", value=True, help="Garante que a melhor solução da geração anterior passe direto para a próxima geração sem sofrer mutação ou cruzamento.")
 
-    dynamic_info_html = f"""
-            <div style='background-color: #1e1e1e; padding: 10px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 14px; margin-bottom: 15px;'>
-                {dyn_selection}<br><br>
-                {dyn_crossover}
-            </div>
-            """
-    
-    with st.sidebar.expander("Detalhes das Técnicas", expanded=False, icon="📖"):
-        st.markdown(dynamic_info_html, unsafe_allow_html=True)
+    animar = st.sidebar.toggle(":primary[:material/slideshow:] Ativar Animação", value=True, help="Visualiza o progresso do algoritmo passo a passo.")
 
-    st.sidebar.divider()
-    
-    animar = st.sidebar.checkbox("▶️ Ativar Animação", value=True, help="Visualiza o progresso do algoritmo passo a passo.")
-    start_btn = st.sidebar.button("Iniciar Evolução", type="primary", use_container_width=True)
-
-    st.sidebar.divider()
-
-    with st.sidebar.popover("⚙️ Configurações Avançadas", use_container_width=True):
-        st.subheader("Mapa de Cidades")
-        
-        cfg_size = st.radio("Tamanho do Mapa", list(SIZE_OPTIONS.keys()), index=1, horizontal=True)
-        
-        if st.button("🎲 Gerar Novo Mapa Aleatório", use_container_width=True):
-            st.session_state.num_cities = SIZE_OPTIONS[cfg_size]
-            st.session_state.cities = generate_cities(st.session_state.num_cities)
-            st.session_state.best_route = list(range(st.session_state.num_cities))
-            st.session_state.best_distance = route_distance(st.session_state.best_route, st.session_state.cities)
-            st.session_state.generations_count = 0
-            st.session_state.mutations_count = 0
-            st.rerun()
-
-        st.divider()
+    with st.sidebar.popover(":primary[:material/settings:] Configurações Avançadas", use_container_width=True):
         st.subheader("Variáveis do Algoritmo Genético")
         
         cfg_pop = st.radio("Tamanho da População", list(POP_OPTIONS.keys()), index=1, horizontal=True)
@@ -346,9 +362,14 @@ def main():
             cfg_k = st.radio("Tamanho do Torneio (K)", list(K_OPTIONS.keys()), index=1, horizontal=True)
             k_tournament = K_OPTIONS[cfg_k]
 
-        st.divider()
+        st.markdown(custom_divider, unsafe_allow_html=True)
+
         st.subheader("Critérios de Parada Extras")
         distancia_alvo = st.number_input("Distância Alvo (Solução Satisfatória)", value=0.0, step=10.0, help="O algoritmo encerra se encontrar uma 'Solução Satisfatória' (menor ou igual a este valor). Deixe 0.0 para ignorar e rodar até o Limite de Gerações.")
+
+    st.sidebar.markdown(custom_divider, unsafe_allow_html=True)
+    
+    start_btn = st.sidebar.button("Iniciar Evolução", type="primary", use_container_width=True)
 
     # Obter a contagem final atual de cidades para o loop
     num_cities = st.session_state.num_cities
