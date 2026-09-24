@@ -274,7 +274,7 @@ def main():
     )
 
     title_html = f"""
-                <div style='background-color: #1e1e1e; padding: 5px; border-radius: 5px; border-left: 4px solid {primary_color};'>
+                <div style='background-color: #191c20; padding: 5px; border-radius: 5px; border-left: 4px solid {primary_color};'>
                     <h1 style='font-size: 32px; margin-left: 10px;'><b>Problema do Caixeiro Viajante</b><br>
                         <i style='font-size: 20px; margin-left: 10px;'><b style='color: {primary_color};'>Grupo: </b> Ana, Luan e Wesley</i>
                     </h1>
@@ -286,7 +286,7 @@ def main():
 
     # Texto de Explicação + Informação sobre a Mutação Fixa
     info_html = f"""
-            <div style='background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 16px; margin-bottom: 15px;'>
+            <div style='background-color: #191c20; padding: 15px; border-radius: 5px; border-left: 2px solid #5ea1ff; font-size: 16px; margin-bottom: 15px;'>
                 <b style='color: #5ea1ff;'>Meta-Heurística: Algoritmo Genético</b><br>
                 O PCV exato tem complexidade <b>O(N!)</b> (NP-Difícil). <br><br>
                 Nesta aplicação, a IA explora apenas <b>O(População × Gerações)</b> estados, limitando drasticamente o espaço de busca e trocando a garantia da solução perfeita por uma convergência rápida e inteligente.<br><br>
