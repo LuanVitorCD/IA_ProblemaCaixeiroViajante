@@ -483,19 +483,22 @@ def main():
                         
                         time.sleep(FRAME_DELAY)
                             
-            # FIM: Quando terminar todas as gerações (ou parar antes)
-            if not animar:
-                metric_dist.metric("Melhor Distância", f"{best_overall_dist:.2f}", delta="Concluído")
-                metric_gen.metric("Geração Atual", f"{gen} / {max_gen}")
-                metric_mut.metric("Mutações Ocorridas", total_mutations)
-                
-                fig = plot_route(st.session_state.cities, best_overall_route, best_overall_dist, gen)
-                buf = io.BytesIO()
-                fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), pad_inches=0.1)
-                buf.seek(0)
-                chart_placeholder.image(buf)
-                plt.close(fig)
-                
+            st.session_state.best_distance = best_overall_dist
+            st.session_state.best_route = best_overall_route
+            st.session_state.generations_count = gen
+            st.session_state.mutations_count = total_mutations
+
+            metric_dist.metric("Melhor Distância", f"{best_overall_dist:.2f}", delta="Concluído")
+            metric_gen.metric("Geração Atual", f"{gen} / {max_gen}")
+            metric_mut.metric("Mutações Ocorridas", total_mutations)
+            
+            fig = plot_route(st.session_state.cities, best_overall_route, best_overall_dist, gen)
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor(), pad_inches=0.1)
+            buf.seek(0)
+            chart_placeholder.image(buf)
+            plt.close(fig)
+            
             st.success(f"Evolução concluída! Melhor distância alcançada: {best_overall_dist:.2f}")
 
 if __name__ == "__main__":
